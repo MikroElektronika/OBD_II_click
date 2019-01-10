@@ -1,0 +1,101 @@
+{*
+Example for OBD_II Click
+
+    Date          : Dec 2017.
+    Author        : MikroE Team
+
+Test configuration STM32 :
+    
+    MCU              : STM32F107VCT6
+    Dev. Board       : EasyMx PRO v7 for STM32
+    ARM Compiler ver : v6.0.0.0
+
+---
+
+Description :
+
+The application is composed of three sections :
+
+- System Initialization - Initializes GPIO pins, and two UART modules. First one for 
+communication with OBD II click and second one for data logging
+- Application Initialization - Initializes OBD II Driver and setups auto mode.
+- Application Task - (code snippet) - Sequentially queries OBD II click for 
+current RPM. OBD II click provides response about current RPM in hexadecimal format 
+so it is converted to decimal format and logged using UART module for information logging.
+
+NOTE :
+
+This example will not work on all vehicles because not all car manufacturers uses same
+format of messages for diagnostic.
+
+NOTE 2 :
+
+There is no checking of connection with car implemented.
+
+*}
+program Click_OBD_II_STM;
+
+uses Click_OBD_II_types, Click_OBD_II_config;
+
+const
+    OBDII_AUTOMODE : array[6] of uint8_t = ( 'A', 'T', 'S', 'P', '0', 0 );
+    RPM_CMD : array[5] of uint8_t = ( '0', '1', '0', 'C', 0 );
+    
+var
+    rpm : uint16_t; 
+    rsp : array[256] of uint8_t; 
+    
+procedure systemInit(); 
+begin
+
+    mikrobus_gpioInit(_MIKROBUS1, _MIKROBUS_RST_PIN, _GPIO_OUTPUT); 
+    mikrobus_gpioInit(_MIKROBUS1, _MIKROBUS_INT_PIN, _GPIO_INPUT); 
+    mikrobus_uartInit(_MIKROBUS1, @_OBDII_UART_CFG[0]); 
+    mikrobus_logInit(_LOG_USBUART_A, 9600); 
+    Delay_ms(100); 
+
+end;
+
+procedure applicationInit(); 
+begin
+
+    obdII_uartDriverInit(T_OBDII_P(@_MIKROBUS1_GPIO), T_OBDII_P(@_MIKROBUS1_UART)); 
+    obdII_sendCommand(@OBDII_AUTOMODE[0]); 
+    mikrobus_logWrite('OBD II initialized', _LOG_LINE); 
+
+end;
+
+procedure applicationTask(); 
+var
+    res : uint8_t;
+    tmp : array[26] of char;
+begin
+
+    res := 0; 
+    obdII_sendCommand(@RPM_CMD[0]); 
+    while ((res = 0)) do 
+    begin 
+        res := obdII_responseReady(); 
+        obdII_process(); 
+    end;
+
+    obdII_readResponse(@rsp[0]); 
+    memcpy(@tmp[0], @rsp[0], 25); 
+    tmp[25] := 0; 
+
+    mikrobus_logWrite('Current RPM : ', _LOG_TEXT); 
+    mikrobus_logWrite(tmp, _LOG_LINE); 
+    Delay_ms(1000); 
+
+end;
+
+begin
+
+    systemInit(); 
+    applicationInit(); 
+    while (1) do 
+    begin 
+        applicationTask(); 
+    end;
+
+end.

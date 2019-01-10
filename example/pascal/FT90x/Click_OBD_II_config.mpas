@@ -1,0 +1,9 @@
+unit Click_OBD_II_config;
+
+uses Click_OBD_II_types;
+
+const
+    _OBDII_POLL_ENABLE : uint8_t = 1; 
+    _OBDII_UART_CFG : array[1] of uint32_t = (9600); 
+    
+end.
